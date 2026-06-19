@@ -1,11 +1,14 @@
 # `mcp_client.py` 逐行精读
 
+这个项目使用了官方的python sdk: https://modelcontextprotocol.io/docs/develop/build-client
+
 以"MCP 客户端在做什么 / 底层发了什么 JSON-RPC"和"这是什么 Python 语法、作用是什么"
 两条线索逐行拆解本仓库的 `mcp_client.py`,并与官方 client 快速入门 (quickstart) 互相映照。
 
 quickstart client.py: https://github.com/modelcontextprotocol/quickstart-resources/blob/main/mcp-client-python/client.py
 
 > **grounding 说明**
+>
 > - 🟢 **已核实**:在本工作区的源码中直接核对过(repo 文件,或 `.venv` 里的 mcp SDK 源码),给出路径 + 行号。
 > - 🟡 **示意**:JSON-RPC 报文 (payload) 的整体形状按 MCP 规范给出,属于代表性示例;其中**方法名 (method) 字符串均为 🟢 已核实**,但字段细节(如 `protocolVersion` 取值、`id` 起始值)随 SDK 版本而变。
 >
@@ -30,6 +33,7 @@ quickstart client.py: https://github.com/modelcontextprotocol/quickstart-resourc
 (`FastMCP("DocumentMCP")` 服务器),以 `uv run mcp_server.py` 拉起。
 
 **两项底层事实(🟢 已在 SDK 源码核实)**:
+
 - JSON-RPC 方法名字符串存在于 SDK 中:`initialize`、`notifications/initialized`、
   `tools/list`、`tools/call`、`prompts/list`、`prompts/get`、`resources/read`、
   `resources/list`、`resources/templates/list`、`ping`。
@@ -96,10 +100,12 @@ async def connect(self):
 逐句拆开,**重点看"哪一句才真正产生进程/网络行为"**:
 
 **line 23-27 `StdioServerParameters(...)`**
+
 - Python:构造一个配置对象,关键字传参。
 - MCP:**还没动**,只是把命令打包成结构体。
 
 **line 28-30 `enter_async_context(stdio_client(server_params))`**
+
 - Python:`stdio_client(...)` 是 `@asynccontextmanager`;`enter_async_context` 进入它并把
   清理登记到 stack(`await` 因为是异步)。
 - MCP:**这一句才真正 spawn 子进程**(`uv run mcp_server.py`)并把管道接到它的
@@ -107,10 +113,12 @@ async def connect(self):
   纯 OS 层的进程启动 + 管道连接。
 
 **line 31 `_stdio, _write = stdio_transport`**
+
 - Python:**元组解包 (tuple unpacking)**,把那对流拆给两个变量。
 - 小坑:命名有点误导——`_stdio` 其实是**接收(读)流**,`_write` 是**发送(写)流**。
 
 **line 32-34 `ClientSession(_stdio, _write)`**
+
 - Python:同样 `enter_async_context` 登记到 stack。
 - MCP:把裸字节流**包成协议层**(负责 JSON-RPC 的 `id` 配对、通知分发)。
   **构造时也还不发消息**。
@@ -138,8 +146,9 @@ async def connect(self):
 
 每条消息都是**一行 JSON + `\n`** 写入子进程 stdin。握手做三件事:协商协议版本、
 互换 capabilities、客户端最后发 `initialized` 表示"我准备好了"。
+
 - **映照 quickstart**:`connect_to_server()` 里就是 `stdio_client → ClientSession →
-  session.initialize()`,顺序一字不差。
+session.initialize()`,顺序一字不差。
 
 ---
 
@@ -245,9 +254,10 @@ if __name__ == "__main__":
 
 本仓库(🟢):`mcp_client.py:1-91`(逐行)。
 SDK 源码 in `.venv`(🟢):
+
 - `mcp/client/stdio/__init__.py:105-106`(`stdio_client` 为 `@asynccontextmanager`)、
   `:150`(读端按 `"\n"` 切分)、`:172-174`(写端 `model_dump_json(...) + "\n"`)。
 - JSON-RPC 方法名字符串(`initialize` / `notifications/initialized` / `tools/list` /
   `tools/call` / `prompts/list` / `prompts/get` / `resources/read` / `resources/list` 等)
   均在 mcp 包内核实存在。
-官方 client 快速入门(对照):https://modelcontextprotocol.io/quickstart/client
+  官方 client 快速入门(对照):https://modelcontextprotocol.io/quickstart/client
