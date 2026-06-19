@@ -3,6 +3,8 @@
 以"MCP 客户端在做什么 / 底层发了什么 JSON-RPC"和"这是什么 Python 语法、作用是什么"
 两条线索逐行拆解本仓库的 `mcp_client.py`,并与官方 client 快速入门 (quickstart) 互相映照。
 
+quickstart client.py: https://github.com/modelcontextprotocol/quickstart-resources/blob/main/mcp-client-python/client.py
+
 > **grounding 说明**
 > - 🟢 **已核实**:在本工作区的源码中直接核对过(repo 文件,或 `.venv` 里的 mcp SDK 源码),给出路径 + 行号。
 > - 🟡 **示意**:JSON-RPC 报文 (payload) 的整体形状按 MCP 规范给出,属于代表性示例;其中**方法名 (method) 字符串均为 🟢 已核实**,但字段细节(如 `protocolVersion` 取值、`id` 起始值)随 SDK 版本而变。
