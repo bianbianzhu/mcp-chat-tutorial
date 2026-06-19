@@ -51,3 +51,6 @@ def edit_document(
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
+
+# To start the server inspector use:
+# mcp dev mcp_server.py
