@@ -281,6 +281,12 @@ Verified in-session (🟢):
 - **`frozen modules ... may make the debugger miss breakpoints`:** harmless debugpy
   notice. To silence/strictly fix, run Python with `-Xfrozen_modules=off` or set
   `PYDEVD_DISABLE_FILE_VALIDATION=1`.
+- **`DeprecationWarning: ...multi-threaded, use of fork() may lead to deadlocks...`
+  (from `debugpy/adapter/__main__.py`):** harmless and **not** from this project. It's
+  debugpy double-forking to daemonize its adapter (`adapter/__main__.py:32-40`), which
+  Python 3.12+ flags because `os.fork()` runs in a multi-threaded process. It appears for
+  any debugpy session on Python 3.13. Can't be silenced via `launch.json` `env` (that
+  applies to the debuggee, not the adapter process) — ignore it.
 - **No input at the REPL / weird prompt:** the client config must use
   `"console": "integratedTerminal"` (prompt_toolkit needs a TTY).
 
