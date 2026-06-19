@@ -37,21 +37,32 @@ uv add --dev debugpy
 This lands in `[dependency-groups] dev` in `pyproject.toml` (here: `debugpy>=1.8.21`).
 Runtime deps are untouched — a debugger is dev-only.
 
-### (b) Forward the environment to the server subprocess — THE critical fix
-In the MCP client wrapper (`mcp_client.py`), where `StdioServerParameters` is built:
+### (b) Forward the debugger vars to the server subprocess — THE critical fix
+In the MCP client wrapper (`mcp_client.py`), build the subprocess env with a helper
+that forwards **only** debugger vars, **only** while debugging (secrets never leave —
+see §3 for why the naive "forward everything" version is unsafe):
 ```python
-server_params = StdioServerParameters(
-    command=self._command,
-    args=self._args,
-    # Forward the parent environment to the server subprocess. Without this,
-    # stdio_client passes only a 6-var allowlist (get_default_environment),
-    # which strips DEBUG_MCP_SERVER and debugpy's auto-attach vars.
-    env={**os.environ, **(self._env or {})},
-)
+def _subprocess_env(self) -> Optional[dict]:
+    # Default: env=None -> the SDK's safe get_default_environment() (PATH/HOME/... only).
+    # Only when DEBUG_MCP_SERVER is set do we add the debugger vars on top; the SDK
+    # still merges them with get_default_environment(), so PATH etc. remain available.
+    env = dict(self._env or {})
+    if os.environ.get("DEBUG_MCP_SERVER"):
+        env["DEBUG_MCP_SERVER"] = os.environ["DEBUG_MCP_SERVER"]
+        env.update({k: v for k, v in os.environ.items()
+                    if k.startswith(("DEBUGPY_", "PYDEVD_"))})
+    return env or None
+
+async def connect(self):
+    server_params = StdioServerParameters(
+        command=self._command,
+        args=self._args,
+        env=self._subprocess_env(),
+    )
+    ...
 ```
-(Requires `import os` at the top.) Without this, **nothing** you set in the parent
-reaches the server — see §2. ⚠️ This forwards *all* env vars; see §3 for the secure
-variant.
+(Requires `import os` at the top.) Without forwarding the flag, **nothing** you set in
+the parent reaches the server — see §2.
 
 ### (c) Add an opt-in debug listener in the server
 The server's stdin/stdout are the JSON-RPC channel, so you **cannot** use a terminal
@@ -180,13 +191,12 @@ reliably fire across the asyncio-subprocess + wrapper path. Net: treat server
 auto-attach as unreliable for stdio MCP servers and use explicit listen+attach.
 
 ### The fix and why it works
-Pass a non-`None` env that includes what you need:
-```python
-env={**os.environ, **(self._env or {})}
-```
-Because `server.env is not None` now, the SDK takes the merge branch
+Pass a non-`None` env that includes the flag (see the `_subprocess_env()` helper in
+§1b). When `server.env is not None`, the SDK takes the merge branch
 (`{**get_default_environment(), **server.env}`, line 127) — so `PATH`/`HOME` are still
-present **and** `DEBUG_MCP_SERVER` (and debugpy's vars) ride along to the server.
+present **and** `DEBUG_MCP_SERVER` (plus any `DEBUGPY_*`/`PYDEVD_*` vars) ride along to
+the server. When not debugging, the helper returns `None`, so the SDK uses its safe
+default unchanged.
 
 ### Verification (🟢 in-session, headless)
 A probe spawned the server through `MCPClient` with `DEBUG_MCP_SERVER=1` and checked
@@ -203,41 +213,31 @@ blocked in `wait_for_client()` (the "pause at startup" behavior).
 ## 3. Security concern and how to avoid it
 
 ### The concern
-`env={**os.environ, ...}` forwards **every** parent environment variable — including
-secrets like `ANTHROPIC_API_KEY` — to **every** spawned MCP server. In this app
-`main.py` can also spawn arbitrary servers passed on the command line
+A naive fix — `env={**os.environ, ...}` — forwards **every** parent environment
+variable, including secrets like `ANTHROPIC_API_KEY`, to **every** spawned MCP server.
+In this app `main.py` can also spawn arbitrary servers passed on the command line
 (`main.py:44-49`, `server_scripts = sys.argv[1:]`). So a **malicious or compromised
-third-party MCP server** would receive your API keys and could exfiltrate them. This
-is exactly the leakage the SDK's allowlist was designed to prevent — the blunt fix
+third-party MCP server** would receive your API keys and could exfiltrate them. This is
+exactly the leakage the SDK's allowlist was designed to prevent — forwarding everything
 trades it away.
 
-### How to avoid it — forward only debug vars, only when debugging (recommended)
-Return a minimal env: rely on the SDK's safe default for `PATH`/`HOME`, and add **only**
-debugger vars, **only** when the debug flag is set. Secrets are never forwarded.
-```python
-import os
+### How it's avoided here — ✅ applied
+The code uses the `_subprocess_env()` helper (§1b): rely on the SDK's safe default for
+`PATH`/`HOME`, and add **only** debugger vars (`DEBUG_MCP_SERVER`, `DEBUGPY_*`,
+`PYDEVD_*`), **only** when the debug flag is set. When the dict is non-empty the SDK
+still merges in `get_default_environment()` (so `PATH` etc. work), but secrets are never
+copied. When not debugging it returns `None` → exact original SDK behavior. The explicit
+attach path still works; nothing functional is lost (server auto-attach didn't work
+anyway).
 
-def _subprocess_env(self) -> dict | None:
-    env = dict(self._env or {})
-    if os.environ.get("DEBUG_MCP_SERVER"):          # only while debugging
-        env["DEBUG_MCP_SERVER"] = os.environ["DEBUG_MCP_SERVER"]
-        env.update({k: v for k, v in os.environ.items()
-                    if k.startswith(("DEBUGPY_", "PYDEVD_"))})
-    return env or None   # None -> SDK uses get_default_environment() (PATH/HOME/...)
-
-async def connect(self):
-    server_params = StdioServerParameters(
-        command=self._command,
-        args=self._args,
-        env=self._subprocess_env(),
-    )
-    ...
+Verified in-session (🟢):
 ```
-Why it's safe and sufficient: when the dict is non-empty the SDK still merges in
-`get_default_environment()` (so `PATH` etc. work), but `ANTHROPIC_API_KEY` and other
-secrets are never copied. When not debugging, it returns `None` → exact original SDK
-behavior. The explicit attach path still works; nothing functional is lost (server
-auto-attach didn't work anyway).
+[debug ON]  DEBUG_MCP_SERVER forwarded : True
+[debug ON]  DEBUGPY_* forwarded        : True
+[debug ON]  SECRET NOT forwarded       : True     # ANTHROPIC_API_KEY absent
+[debug ON]  forwarded keys             : ['DEBUGPY_FAKE_LAUNCHER_PORT', 'DEBUG_MCP_SERVER']
+[debug OFF] env is None (SDK default)  : True
+```
 
 ### Other hardening options
 - **Trust boundary per client:** only forward to the first-party `doc_client`, never to
