@@ -19,14 +19,30 @@ class MCPClient:
         self._session: Optional[ClientSession] = None
         self._exit_stack: AsyncExitStack = AsyncExitStack()
 
+    def _subprocess_env(self) -> Optional[dict]:
+        # By default we let the MCP SDK use its safe behavior: env=None ->
+        # get_default_environment() (only PATH/HOME/... — NOT secrets like
+        # ANTHROPIC_API_KEY). Only when DEBUG_MCP_SERVER is set do we add the
+        # debugger vars on top, so the server's debugpy listener can start. The
+        # SDK still merges these with get_default_environment(), so PATH etc.
+        # remain available. Secrets are never forwarded to the subprocess.
+        env = dict(self._env or {})
+        if os.environ.get("DEBUG_MCP_SERVER"):
+            env["DEBUG_MCP_SERVER"] = os.environ["DEBUG_MCP_SERVER"]
+            env.update(
+                {
+                    k: v
+                    for k, v in os.environ.items()
+                    if k.startswith(("DEBUGPY_", "PYDEVD_"))
+                }
+            )
+        return env or None
+
     async def connect(self):
         server_params = StdioServerParameters(
             command=self._command,
             args=self._args,
-            # Forward the parent environment to the server subprocess. Without this,
-            # stdio_client passes only a 6-var allowlist (get_default_environment),
-            # which strips DEBUG_MCP_SERVER and debugpy's auto-attach vars.
-            env={**os.environ, **(self._env or {})},
+            env=self._subprocess_env(),
         )
         stdio_transport = await self._exit_stack.enter_async_context(
             stdio_client(server_params)
