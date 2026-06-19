@@ -1,0 +1,46 @@
+{
+  // VS Code debug configs for the MCP Chat app.
+  // Requires the Python extension (ms-python.python). Select the .venv interpreter
+  // (Cmd+Shift+P -> "Python: Select Interpreter" -> ./.venv) so debugpy is found.
+  //
+  // NOTE: mcp_client.py now forwards the full parent env to the server subprocess
+  // (the MCP SDK otherwise strips everything except a 6-var allowlist), so the
+  // DEBUG_MCP_SERVER flag and debugpy's vars actually reach mcp_server.py.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Debug the CLIENT only. prompt_toolkit needs a real terminal -> integratedTerminal.
+      // No flag set, so the server runs normally (no startup hang).
+      "name": "Debug client (main.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "subProcess": true,
+      "justMyCode": false
+    },
+    {
+      // Debug client AND server. Sets DEBUG_MCP_SERVER=1, which (thanks to env
+      // forwarding) makes mcp_server.py call debugpy.listen(5679) + wait_for_client().
+      // Startup will PAUSE here -> then run "Attach to MCP server (:5679)" below.
+      "name": "Debug client + server (waits for :5679 attach)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "subProcess": true,
+      "justMyCode": false,
+      "env": { "DEBUG_MCP_SERVER": "1" }
+    },
+    {
+      // Run this AFTER launching the config above, to attach to mcp_server.py.
+      "name": "Attach to MCP server (:5679)",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "127.0.0.1", "port": 5679 },
+      "justMyCode": false
+    }
+  ]
+}

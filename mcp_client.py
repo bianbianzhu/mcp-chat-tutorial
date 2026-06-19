@@ -1,11 +1,10 @@
+import os
 import sys
 import asyncio
 from typing import Optional, Any
 from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
-from pydantic import AnyUrl
-
 
 class MCPClient:
     def __init__(
@@ -24,7 +23,10 @@ class MCPClient:
         server_params = StdioServerParameters(
             command=self._command,
             args=self._args,
-            env=self._env,
+            # Forward the parent environment to the server subprocess. Without this,
+            # stdio_client passes only a 6-var allowlist (get_default_environment),
+            # which strips DEBUG_MCP_SERVER and debugpy's auto-attach vars.
+            env={**os.environ, **(self._env or {})},
         )
         stdio_transport = await self._exit_stack.enter_async_context(
             stdio_client(server_params)
@@ -61,8 +63,7 @@ class MCPClient:
         return []
 
     async def read_resource(self, uri: str) -> Any:
-        result = await self.session().read_resource(AnyUrl(uri))
-        return result
+        return []
 
     async def cleanup(self):
         await self._exit_stack.aclose()
@@ -84,7 +85,8 @@ async def main():
         args=["run", "mcp_server.py"],
     ) as _client:
         pass
-
+        # result = await _client.list_tools()
+        # print(result)
 
 if __name__ == "__main__":
     if sys.platform == "win32":

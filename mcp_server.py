@@ -50,6 +50,17 @@ def edit_document(
 
 
 if __name__ == "__main__":
+    # Opt-in remote debugging: set DEBUG_MCP_SERVER=1 to make this stdio subprocess
+    # wait for the VS Code "Attach to MCP server (:5679)" config before running.
+    # debugpy uses a TCP socket, so it never corrupts the stdin/stdout JSON-RPC channel.
+    import os
+
+    if os.getenv("DEBUG_MCP_SERVER"):
+        import debugpy
+
+        debugpy.listen(("127.0.0.1", 5679))
+        debugpy.wait_for_client()  # blocks until you attach; the client's connect() pauses here
+
     mcp.run(transport="stdio")
 
 # To start the server inspector use:
