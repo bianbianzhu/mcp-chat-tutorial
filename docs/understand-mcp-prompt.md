@@ -99,20 +99,20 @@ The final step in building our MCP client is implementing prompt functionality. 
 
 The `list_prompts` method is straightforward. It calls the session's list prompts function and returns the prompts:
 
-```
+```python
 async def list_prompts(self) -> list[types.Prompt]:
-result = await self.session().list_prompts()
-return result.prompts
+    result = await self.session().list_prompts()
+    return result.prompts
 ```
 
 ## Getting Individual Prompts
 
 The `get_prompt` method is more interesting because it handles variable interpolation. When you request a prompt, you provide arguments that get passed to the prompt function as keyword arguments:
 
-```
+```python
 async def get_prompt(self, prompt_name, args: dict[str, str]):
-result = await self.session().get_prompt(prompt_name, args)
-return result.messages
+    result = await self.session().get_prompt(prompt_name, args)
+    return result.messages
 ```
 
 For example, if your server has a `format_document` prompt that expects a `doc_id` parameter, the arguments dictionary would contain `{"doc_id": "plan.md"}`. This value gets interpolated into the prompt template.
