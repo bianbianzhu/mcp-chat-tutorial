@@ -30,8 +30,8 @@ This doc separates them and traces each function-by-function, with `file:line`.
 
 ### Precondition: the cache is filled once at startup
 ```
-main.py → await cli.initialize()                       core/cli.py:179
-  └─ await self.refresh_resources()                    cli.py:183
+main.py → await cli.initialize()                       main.py:58  (def core/cli.py:179)
+  └─ await self.refresh_resources()                    cli.py:180  (def cli.py:183)
        self.resources = await agent.list_docs_ids()    cli.py:185
                           └─ read_resource("docs://documents")  → server list_docs   ← the ONLY list_docs call in Flow A
        self.completer.update_resources(self.resources) cli.py:186   ← list cached in memory

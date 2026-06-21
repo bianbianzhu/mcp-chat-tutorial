@@ -29,8 +29,8 @@
 
 ### 前提:缓存在启动时被填一次
 ```
-main.py → await cli.initialize()                       core/cli.py:179
-  └─ await self.refresh_resources()                    cli.py:183
+main.py → await cli.initialize()                       main.py:58  (def core/cli.py:179)
+  └─ await self.refresh_resources()                    cli.py:180  (def cli.py:183)
        self.resources = await agent.list_docs_ids()    cli.py:185
                           └─ read_resource("docs://documents")  → server list_docs   ← 流程 A 里唯一一次 list_docs
        self.completer.update_resources(self.resources) cli.py:186   ← 列表缓存进内存
