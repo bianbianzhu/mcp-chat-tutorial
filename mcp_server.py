@@ -45,6 +45,7 @@ def edit_document(
 
 @mcp.resource("docs://documents", mime_type="application/json")
 def list_docs() -> list[str]:
+    # MCP python sdk will automatically convert below into a string 
     return list(docs.keys())
 
 
