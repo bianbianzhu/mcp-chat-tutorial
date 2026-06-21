@@ -9,6 +9,8 @@ Body:
 
 Resources in MCP servers allow you to expose data to clients, similar to GET request handlers in a typical HTTP server. They're perfect for scenarios where you need to fetch information rather than perform actions.
 
+![Resources overview](images/mcp-resources.png)
+
 ## Understanding Resources Through an Example
 
 Let's say you want to build a document mention feature where users can type `@document_name` to reference files. This requires two operations:
@@ -16,7 +18,15 @@ Let's say you want to build a document mention feature where users can type `@do
 - Getting a list of all available documents (for autocomplete)
 - Fetching the contents of a specific document (when mentioned)
 
+![Mentioning a document](images/mention-a-document.png)
+
+These two operations map directly onto two things we need the MCP server to do:
+
+![The two features resources provide](images/resources-two-features.png)
+
 When a user mentions a document, your system automatically injects the document's contents into the prompt sent to Claude, eliminating the need for Claude to use tools to fetch the information.
+
+![Injecting document contents into the prompt](images/read-resource.png)
 
 ## How Resources Work
 
@@ -24,36 +34,42 @@ Resources follow a request-response pattern. When your client needs data, it sen
 
 The flow looks like this: your code requests a resource from the MCP client, which forwards the request to the MCP server. The server processes the URI, runs the appropriate function, and returns the result.
 
+![Resource request-response sequence](images/resources-sequence-diagram.png)
+
 ## Types of Resources
 
 There are two types of resources:
+
+![Direct vs templated resources](images/two-resource-types.png)
 
 ### Direct Resources
 
 Direct resources have static URIs that never change. They're perfect for operations that don't need parameters.
 
-```
+```python
 @mcp.resource(
-"docs://documents",
-mime_type="application/json"
+    "docs://documents",
+    mime_type="application/json"
 )
 def list_docs() -> list[str]:
-return list(docs.keys())
+    return list(docs.keys())
 ```
 
 ### Templated Resources
 
 Templated resources include parameters in their URIs. The Python SDK automatically parses these parameters and passes them as keyword arguments to your function.
 
-```
+![Templated resource arguments](images/templated-resource-args.png)
+
+```python
 @mcp.resource(
-"docs://documents/{doc_id}",
-mime_type="text/plain"
+    "docs://documents/{doc_id}",
+    mime_type="text/plain"
 )
 def fetch_doc(doc_id: str) -> str:
-if doc_id not in docs:
-raise ValueError(f"Doc with id {doc_id} not found")
-return docs[doc_id]
+    if doc_id not in docs:
+        raise ValueError(f"Doc with id {doc_id} not found")
+    return docs[doc_id]
 ```
 
 ## Implementation Details
@@ -82,12 +98,3 @@ Then connect to the inspector in your browser. You'll see two sections:
 Click on any resource to test it. For templated resources, you'll need to provide values for the parameters. The inspector shows you the exact response structure your client will receive, including the MIME type and serialized data.
 
 Resources provide a clean way to expose read-only data from your MCP server, making it easy for clients to fetch information without the complexity of tool calls.
-
-Images:
-
-- [Image 1](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1749849287%2F09_-_007_-_Defining_Resources_01.1749849287240.png)
-- [Image 2](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1749849287%2F09_-_007_-_Defining_Resources_02.1749849287776.png)
-- [Image 3](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1749849288%2F09_-_007_-_Defining_Resources_05.1749849288268.png)
-- [Image 4](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1749849289%2F09_-_007_-_Defining_Resources_06.1749849288783.png)
-- [Image 5](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1749849289%2F09_-_007_-_Defining_Resources_07.1749849289476.png)
-- [Image 6](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1749849290%2F09_-_007_-_Defining_Resources_18.1749849290021.png)
