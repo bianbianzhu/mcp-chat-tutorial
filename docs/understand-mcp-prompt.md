@@ -9,6 +9,8 @@ Body:
 
 The final step in building our MCP client is implementing prompt functionality. This allows us to list all available prompts from the server and retrieve specific prompts with variables filled in.
 
+![The "format document" feature: the user types "/" to list available prompts, specifies a document ID, and Claude reads the document then prints a Markdown-formatted version.](images/mcp-prompts-slash-command.png)
+
 ## Implementing List Prompts
 
 The `list_prompts` method is straightforward. It calls the session's list prompts function and returns the prompts:
@@ -35,11 +37,15 @@ For example, if your server has a `format_document` prompt that expects a `doc_i
 
 Once implemented, you can test prompts through the CLI. When you type a slash (`/`), available prompts appear as commands. Selecting a prompt like "format" will prompt you to choose from available documents.
 
+![Running `/format plan.md` in the CLI — after the prompt is selected, the client lists the available documents to choose from.](images/prompts-in-client-11.png)
+
 After selecting a document, the system sends the complete prompt to Claude. The AI receives both the formatting instructions and the document ID, then uses available tools to fetch and process the content.
 
 ## How Prompts Work
 
 Prompts define a set of user and assistant messages that clients can use. They should be high-quality, well-tested, and relevant to your MCP server's purpose. The workflow is:
+
+![Prompts are defined on the MCP server with the `@mcp.prompt` decorator and return a list of messages; clients can request them at any time.](images/prompts-in-client-17.png)
 
 - Write and evaluate a prompt relevant to your server's functionality
 - Define the prompt in your MCP server using the `@mcp.prompt` decorator
@@ -48,8 +54,3 @@ Prompts define a set of user and assistant messages that clients can use. They s
 - The function returns formatted messages ready for the AI model
 
 This system creates reusable, parameterized prompts that maintain consistency while allowing customization through variables. It's particularly useful for complex workflows where you want to ensure the AI receives properly structured instructions every time.
-
-Images:
-
-- [Image 1](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1751999840%2F011_-_Prompts_in_the_Client_11.1751999840520.png)
-- [Image 2](https://everpath-course-content.s3-accelerate.amazonaws.com/instructor%2Fa46l9irobhg0f5webscixp0bs%2Fpublic%2F1751999841%2F011_-_Prompts_in_the_Client_17.1751999841663.png)
