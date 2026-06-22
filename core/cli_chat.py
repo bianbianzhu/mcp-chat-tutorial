@@ -53,12 +53,57 @@ class CliChat(Chat):
             return False
 
         words = query.split()
-        command = words[0].replace("/", "")
+        # Strip only the leading "/" — replace("/", "") would also drop slashes
+        # inside the token (e.g. "/fo/rmat" -> "format"), masking a typo.
+        command = words[0].removeprefix("/")
 
-        messages = await self.doc_client.get_prompt(
-            command, {"doc_id": words[1]}
+        # Look up the prompt definition so we know its declared argument names
+        # (no more hardcoded "doc_id"). One extra prompts/list round-trip per
+        # slash command — acceptable; Flow B already does a live get_prompt.
+        prompt = next(
+            (p for p in await self.list_prompts() if p.name == command), None
         )
 
+        if prompt is None:
+            # Unknown command: preserve existing behavior — let the server reject
+            # the unknown prompt (raises McpError, as before).
+            messages = await self.doc_client.get_prompt(command, {})
+            self.messages += convert_prompt_messages_to_message_params(messages)
+            return True
+
+        # Map positional words to the prompt's declared arguments, by name.
+        arg_defs = prompt.arguments or []
+        provided = words[1:]
+        args = {
+            a.name: provided[i]
+            for i, a in enumerate(arg_defs)
+            if i < len(provided)
+        }
+        missing = [
+            a.name
+            for i, a in enumerate(arg_defs)
+            if a.required and i >= len(provided)
+        ]
+
+        if missing:
+            # A required argument was omitted (e.g. "/format" with no doc id).
+            # Don't render the template — appending a message keeps self.messages
+            # non-empty (avoids an empty-messages 400) and lets the agent loop run
+            # so the model can ask the user for the missing argument.
+            self.messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        f"I ran the /{command} command ({prompt.description}) but "
+                        f"did not provide the required argument(s): "
+                        f"{', '.join(missing)}. Ask me to provide it before doing "
+                        f"anything else."
+                    ),
+                }
+            )
+            return True
+
+        messages = await self.doc_client.get_prompt(command, args)
         self.messages += convert_prompt_messages_to_message_params(messages)
         return True
 
