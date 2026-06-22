@@ -78,10 +78,22 @@ def format_document(
     
     return [base.UserMessage(prompt)]
 
+@mcp.prompt(
+    name="summarize-a-doc",
+    description="Summarize a doc in a particular way"
+) 
+def summarize_document(doc_id: str = Field(description="Id of the document to format")) ->list[base.Message]:
+    prompt = f"""
+    You goal is to summarize a document into a ONE liner.
+    
+     The id of the document you need to summarize is:
+    <document_id>
+    {doc_id}
+    </document_id>
 
-
-# TODO: Write a prompt to summarize a doc
-
+    The format should be like `Summarize of doc {doc_id} is: <the summarized content>`
+    """
+    return [base.UserMessage(prompt)]
 
 if __name__ == "__main__":
     # Opt-in remote debugging: set DEBUG_MCP_SERVER=1 to make this stdio subprocess

@@ -103,6 +103,8 @@ CommandAutoSuggest.get_suggestion(buffer, document)    cli.py:19
      len(parts)==1 → start_completion()                 cli.py:151-152   （→ A2 列文档）
      len(parts)==2 且参数像 doc/file/id → start_completion()  cli.py:153-160
 ```
+![slash-fo](./images/slash-fo.png)
+![slash-format-with-space](./images/slash-format-with-space.png)
 
 **要点：** 流程 A = "先显示缓存的命令名，再显示缓存的文档 id，按你输入的内容过滤"。唯一一次
 服务端接触（`list_prompts`）在启动时就完成了。**A1 和 A2 正常；A3 是坏的**（见下文 🐛）——
