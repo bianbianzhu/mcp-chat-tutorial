@@ -65,10 +65,10 @@ class CliChat(Chat):
         )
 
         if prompt is None:
-            # Unknown command: preserve existing behavior — let the server reject
-            # the unknown prompt (raises McpError, as before).
-            messages = await self.doc_client.get_prompt(command, {})
-            self.messages += convert_prompt_messages_to_message_params(messages)
+            # Unknown command — we already know it's not a real prompt, so don't
+            # call the server. Print locally and queue nothing; Chat.run sees no
+            # new message and skips the model call (no round-trip, no empty-msg 400).
+            print(f"Unknown command: /{command}")
             return True
 
         # Map positional words to the prompt's declared arguments, by name.

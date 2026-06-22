@@ -19,7 +19,12 @@ class Chat:
     ) -> str:
         final_text_response = ""
 
+        message_count_before = len(self.messages)
         await self._process_query(query)
+        # Nothing queued this turn (e.g. a slash command handled locally) → no
+        # model call. Also prevents an empty-messages 400 on the first turn.
+        if len(self.messages) == message_count_before:
+            return final_text_response
 
         while True:
             response = self.claude_service.chat(

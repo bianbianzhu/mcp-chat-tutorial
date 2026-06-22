@@ -8,6 +8,9 @@ from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
 from prompt_toolkit.document import Document
 from prompt_toolkit.buffer import Buffer
 
+from anthropic import APIError
+from mcp.shared.exceptions import McpError
+
 from core.cli_chat import CliChat
 
 
@@ -204,7 +207,10 @@ class CliApp:
                     continue
 
                 response = await self.agent.run(user_input)
-                print(f"\nResponse:\n{response}")
+                if response:
+                    print(f"\nResponse:\n{response}")
 
             except KeyboardInterrupt:
                 break
+            except (McpError, APIError) as e:
+                print(f"\nError: {e}")
