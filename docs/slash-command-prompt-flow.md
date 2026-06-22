@@ -326,6 +326,46 @@ if len(parts) >= 2:
 
 ---
 
+## ✅ Fixes applied (this session)
+
+The bug list above is the **original** state (kept for tracing). What actually changed:
+
+### ❶ ❹ ❺ — `_process_command` rewritten (`core/cli_chat.py:51`)
+- **❺** `words[0].replace("/", "")` → `removeprefix("/")` — strips only the *leading*
+  slash, so `/fo/rmat` no longer collapses to `format` and mask a typo.
+- **❹** No more hardcoded `"doc_id"`: look the prompt up via `self.list_prompts()`, then
+  map the positional words onto the prompt's **declared** argument names
+  (`prompt.arguments[i].name`). Generic for any prompt / arg name / arg count.
+- **❶** No more `words[1]` IndexError. When a **required** arg is missing we *skip*
+  `get_prompt` and append a synthesized user message asking the model to prompt the user
+  for it (`/format` → model replies "which document?"). This keeps `self.messages`
+  non-empty (no empty-messages 400) and resolves it conversationally instead of crashing.
+
+### ❷ — unknown command no longer crashes (3 small changes)
+- **`core/cli_chat.py`** — once the lookup gives `prompt is None` we already know it
+  isn't a real command, so we **don't call the server**: just
+  `print(f"Unknown command: /{command}")` and queue nothing.
+- **`core/chat.py`** (`Chat.run`) — if a turn queues **no new message**, return before
+  the agent loop → no model call (this also permanently closes the empty-messages 400
+  risk class).
+- **`core/cli.py`** (`CliApp.run`) — a **narrow safety net**: `except (McpError, APIError)`
+  → print and continue the REPL, so any *other* runtime error (server hiccup, API 400)
+  no longer kills the CLI; truly unexpected exceptions still surface as a traceback. Plus
+  `if response:` to drop the empty `Response:` line.
+
+> Correction to ❷: a **bad doc id** (`/format nope.md`) does **not** crash — the server
+> prompt just interpolates the string (no `docs` lookup). ❷ was only ever the
+> **unknown command** case.
+
+### Still open
+- **❸** (Flow-A A3 completer) — unchanged; the partial-doc-name dropdown is still empty.
+
+🟢 Verified in-session (headless): `/bogus` → prints `Unknown command: /bogus`, no model
+call, REPL stays alive; `/format` → model asks for the id; `/format plan.md` → renders &
+edits as before.
+
+---
+
 ## Sources (🟢 repo `file:line`)
 
 - Flow A: `core/cli.py:19,24,29,32,34,52,70,73,76-83,86,89,90-95,98,101,102,105-109,125,129-130,141,148,151-160,179,181,190,192,193,194` ; `core/cli_chat.py:21,22`

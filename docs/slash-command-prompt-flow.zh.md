@@ -252,6 +252,41 @@ if len(parts) >= 2:
 
 ---
 
+## ✅ 已应用的修复（本次会话）
+
+上面的 bug 列表是**修复前**的状态（保留以便 trace）。实际改动如下：
+
+### ❶ ❹ ❺ —— 重写 `_process_command`（`core/cli_chat.py:51`）
+- **❺** `words[0].replace("/", "")` → `removeprefix("/")` —— 只删**开头**那个斜杠，
+  这样 `/fo/rmat` 不会再被压成 `format` 而掩盖打字错误。
+- **❹** 不再硬编码 `"doc_id"`：通过 `self.list_prompts()` 查到该 prompt，再把位置参数
+  （positional words）按 prompt **声明的**参数名（`prompt.arguments[i].name`）映射。对
+  任意 prompt / 参数名 / 参数个数都通用。
+- **❶** 不再有 `words[1]` 的 IndexError。当**必填**参数缺失时，**跳过** `get_prompt`，
+  改为追加一条合成的用户消息，让模型反过来向用户索要参数（`/format` → 模型回复"要格式化
+  哪个文档？"）。这样 `self.messages` 非空（不会触发空消息 400），用对话方式处理而不是崩溃。
+
+### ❷ —— 未知命令不再崩溃（3 处小改动）
+- **`core/cli_chat.py`** —— 查表得到 `prompt is None` 时，我们已经知道它不是真命令，于是
+  **不再访问服务端**：直接 `print(f"Unknown command: /{command}")`，不入队任何消息。
+- **`core/chat.py`**（`Chat.run`）—— 若本轮**没有入队任何新消息**，就在进入 agent 循环前
+  返回 → 不调用模型（同时彻底消除了空消息 400 这一类隐患）。
+- **`core/cli.py`**（`CliApp.run`）—— **收窄的安全网（narrow safety net）**：
+  `except (McpError, APIError)` → 打印并继续 REPL，这样其他运行时错误（服务端抖动、
+  API 400）也不会再让 CLI 挂掉；真正意外的异常仍会抛出 traceback。另加 `if response:`
+  去掉空的 `Response:` 行。
+
+> 对 ❷ 的更正：错误的文档 id（`/format nope.md`）**不会**崩溃 —— 服务端只是把字符串插值进
+> 模板（没有 `docs` 查找）。❷ 仅指**未知命令**这一种情况。
+
+### 仍未处理
+- **❸**（流程 A 的 A3 补全）—— 未改动，输入部分文档名时下拉框仍为空。
+
+🟢 本次会话无头实测：`/bogus` → 打印 `Unknown command: /bogus`，不调用模型，REPL 存活；
+`/format` → 模型向用户索要 id；`/format plan.md` → 照常渲染并编辑。
+
+---
+
 ## 来源（🟢 仓库 `file:line`）
 
 - 流程 A：`core/cli.py:19,24,29,32,34,52,70,73,76-83,86,89,90-95,98,101,102,105-109,125,129-130,141,148,151-160,179,181,190,192,193,194` ；`core/cli_chat.py:21,22`
