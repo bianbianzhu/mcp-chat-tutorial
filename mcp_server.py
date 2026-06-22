@@ -95,6 +95,16 @@ def summarize_document(doc_id: str = Field(description="Id of the document to fo
     """
     return [base.UserMessage(prompt)]
 
+@mcp.prompt(
+    name="joke-maker",
+    description="Make a joke about cat"
+)
+def make_joke() -> list[base.Message]:
+    prompt = f"""
+    You goal is to tell a joke about cat.
+    """
+    return [base.UserMessage(prompt)]
+
 if __name__ == "__main__":
     # Opt-in remote debugging: set DEBUG_MCP_SERVER=1 to make this stdio subprocess
     # wait for the VS Code "Attach to MCP server (:5679)" config before running.
